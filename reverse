@@ -5,63 +5,10 @@ local playerGui = player:WaitForChild("PlayerGui")
 local screenGui = Instance.new("ScreenGui")
 screenGui.Parent = playerGui
 
--- Invisible Button
-local invisibleButton = Instance.new("TextButton", screenGui)
-invisibleButton.Size = UDim2.new(0, 100, 0, 50)
-invisibleButton.Position = UDim2.new(0, 10, 1, -60) -- Positioned at bottom left
-invisibleButton.Text = "Invisible"
-
--- Function to toggle invisibility when the button is clicked
-invisibleButton.MouseButton1Click:Connect(function()
-    toggleInvisibility()
-    
-    -- Change button text based on invisibility state
-    if getgenv().en then
-        invisibleButton.Text = "Uninvisible"
-    else
-        invisibleButton.Text = "Invisible"
-    end
-end)
-
--- HeadSit Button
-local toggleButton = Instance.new("TextButton", screenGui)
-toggleButton.Size = UDim2.new(0, 100, 0, 50)
-toggleButton.Position = UDim2.new(0, 10, 1, -110) -- Positioned above the invisible button
-toggleButton.Text = "HeadSit: Off"
-toggleButton.BackgroundColor3 = Color3.new(1, 0, 0) -- Red for off state
-
--- Function to toggle HeadSit
-local function toggleHeadSit()
-    headSitActive = not headSitActive
-    if headSitActive then
-        toggleButton.Text = "HeadSit: On"
-        toggleButton.BackgroundColor3 = Color3.new(0, 1, 0) -- Green for on state
-        -- Create platforms for nearby players
-        while headSitActive do
-            for _, otherPlayer in ipairs(game.Players:GetPlayers()) do
-                if otherPlayer ~= player then
-                    createPlatformAboveHead(otherPlayer)
-                end
-            end
-            wait(5) -- Adjust the wait time to control how often we check for players
-        end
-    else
-        toggleButton.Text = "HeadSit: Off"
-        toggleButton.BackgroundColor3 = Color3.new(1, 0, 0) -- Red for off state
-        -- Cleanup all platforms
-        for userId, platform in pairs(platforms) do
-            platform:Destroy()
-            platforms[userId] = nil
-        end
-    end
-end
-
-toggleButton.MouseButton1Click:Connect(toggleHeadSit)
-
 -- Reverse Button
 local reverseButton = Instance.new("TextButton")
 reverseButton.Size = UDim2.new(0, 100, 0, 50)
-reverseButton.Position = UDim2.new(0, 10, 1, -160) -- Positioned above the HeadSit button
+reverseButton.Position = UDim2.new(0, 10, 1, -180) -- Positioned at the bottom left
 reverseButton.Text = "Reverse" -- Initial text
 reverseButton.Font = Enum.Font.SourceSans
 reverseButton.TextSize = 24
