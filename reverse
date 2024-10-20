@@ -8,7 +8,7 @@ screenGui.Parent = playerGui
 -- Reverse Button
 local reverseButton = Instance.new("TextButton")
 reverseButton.Size = UDim2.new(0, 100, 0, 50)
-reverseButton.Position = UDim2.new(0, 10, 1, -210) -- Positioned at the bottom left
+reverseButton.Position = UDim2.new(0, 10, 1, -250) -- Positioned at the bottom left
 reverseButton.Text = "Reverse" -- Initial text
 reverseButton.Font = Enum.Font.SourceSans
 reverseButton.TextSize = 24
