@@ -1,52 +1,39 @@
-local key = "N" -- key to initiate the flashback
-local flashbacklength = 60 -- how long the flashback should be stored in approx seconds
-local flashbackspeed = -1 -- how many frames to skip during flashback (set to 0 to disable)
+-- Create a ScreenGui and Button
+local player = game.Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
-local name = game:GetService("RbxAnalyticsService"):GetSessionId() -- unique id
-local frames, uis, LP, RS = {}, game:GetService("UserInputService"), game:GetService("Players").LocalPlayer, game:GetService("RunService")
+local screenGui = Instance.new("ScreenGui")
+screenGui.Parent = playerGui
 
-local playerGui = LP:WaitForChild("PlayerGui")
-local rewindButton
+local reverseButton = Instance.new("TextButton")
+reverseButton.Size = UDim2.new(0, 200, 0, 50)
+reverseButton.Position = UDim2.new(0.5, -100, 0, 20) -- Centered at the top
+reverseButton.Text = "Reverse" -- Initial text
+reverseButton.Font = Enum.Font.SourceSans
+reverseButton.TextSize = 24
+reverseButton.BackgroundColor3 = Color3.new(0, 1, 0) -- Green color
+reverseButton.TextColor3 = Color3.new(1, 1, 1) -- White text
+reverseButton.Parent = screenGui
 
--- Function to create a button for rewinding
-local function createRewindButton()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Parent = playerGui
-    
-    rewindButton = Instance.new("TextButton")
-    rewindButton.Size = UDim2.new(0, 150, 0, 50)
-    rewindButton.Position = UDim2.new(0.5, -75, 0, 20)
-    rewindButton.Text = "Rewind"
-    rewindButton.Parent = screenGui
-    rewindButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-end
+local frames = {}
+local flashbackEnabled = false
+local flashbackLength = 60 -- seconds
+local flashbackSpeed = 1 -- frames to skip
+local RS = game:GetService("RunService")
+local LP = game.Players.LocalPlayer
 
-pcall(RS.UnbindFromRenderStep, RS, name) -- Unbind the function if previously binded
-
-local function getchar()
+local function getCharacter()
     return LP.Character or LP.CharacterAdded:Wait()
 end
 
-function gethrp(c)
-    return c:FindFirstChild("HumanoidRootPart") or c.RootPart or c.PrimaryPart or c:FindFirstChild("Torso") or c:FindFirstChild("UpperTorso") or c:FindFirstChildWhichIsA("BasePart")
+local function getHRP(character)
+    return character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart
 end
 
-local flashback = {lastinput = false, canrevert = true, rewinding = false}
-
-function flashback:Advance(char, hrp, hum, allowinput)
-    if #frames > flashbacklength * 60 then
+local function advanceMovement(char, hrp, hum)
+    if #frames > flashbackLength * 500 then
         table.remove(frames, 1)
     end
-
-    if allowinput and not self.canrevert then
-        self.canrevert = true
-    end
-
-    if self.lastinput then
-        hum.PlatformStand = false
-        self.lastinput = false
-    end
-
     table.insert(frames, {
         hrp.CFrame,
         hrp.Velocity,
@@ -56,59 +43,60 @@ function flashback:Advance(char, hrp, hum, allowinput)
     })
 end
 
-function flashback:Revert(char, hrp, hum)
+local function revertMovement(char, hrp, hum)
     local num = #frames
-    if num == 0 or not self.canrevert then
-        self.canrevert = false
-        self:Advance(char, hrp, hum)
+    if num == 0 then
         return
     end
-    for i = 1, flashbackspeed do
-        table.remove(frames, num)
+
+    for i = 1, flashbackSpeed do
+        if num <= 0 then break end
         num = num - 1
     end
-    self.lastinput = true
-    local lastframe = frames[num]
+
+    local lastFrame = frames[num]
     table.remove(frames, num)
-    hrp.CFrame = lastframe[1]
-    hrp.Velocity = -lastframe[2]
-    hum:ChangeState(lastframe[3])
-    hum.PlatformStand = lastframe[4]
-    local currenttool = char:FindFirstChildOfClass("Tool")
-    if lastframe[5] then
-        if not currenttool then
-            hum:EquipTool(lastframe[5])
+
+    hrp.CFrame = lastFrame[1]
+    hrp.Velocity = -lastFrame[2]
+    hum:ChangeState(lastFrame[3])
+    hum.PlatformStand = lastFrame[4]
+
+    local currentTool = char:FindFirstChildOfClass("Tool")
+    if lastFrame[5] then
+        if not currentTool then
+            hum:EquipTool(lastFrame[5])
         end
     else
         hum:UnequipTools()
     end
 end
 
--- Function that runs every frame
-local function step()
-    local char = getchar()
-    local hrp = gethrp(char)
+reverseButton.MouseButton1Click:Connect(function()
+    flashbackEnabled = not flashbackEnabled
+    reverseButton.BackgroundColor3 = flashbackEnabled and Color3.new(1, 0, 0) or Color3.new(0, 1, 0) -- Toggle color
+    reverseButton.Text = flashbackEnabled and "UnReverse" or "Reverse" -- Toggle text
+
+    -- Adjust all currently playing animations
+    local char = getCharacter()
     local hum = char:FindFirstChildWhichIsA("Humanoid")
-    if flashback.rewinding then
-        flashback:Revert(char, hrp, hum)
-    else
-        flashback:Advance(char, hrp, hum, true)
-    end
-end
-RS:BindToRenderStep(name, 1, step)
+    local animator = hum:FindFirstChildOfClass("Animator")
 
--- Button functionality to toggle rewinding
-local function toggleRewind()
-    flashback.rewinding = not flashback.rewinding
-    if flashback.rewinding then
-        rewindButton.Text = "Stop Rewind"
-        rewindButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- Green when active
-    else
-        rewindButton.Text = "Rewind"
-        rewindButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Red when inactive
+    if animator then
+        for _, animationTrack in pairs(animator:GetPlayingAnimationTracks()) do
+            animationTrack:AdjustSpeed(flashbackEnabled and -1 or 1) -- Set speed to -1 when reversing, reset to 1 otherwise
+        end
     end
-end
+end)
 
--- Create the button and connect its functionality
-createRewindButton()
-rewindButton.MouseButton1Click:Connect(toggleRewind)
+RS.RenderStepped:Connect(function()
+    local char = getCharacter()
+    local hrp = getHRP(char)
+    local hum = char:FindFirstChildWhichIsA("Humanoid")
+
+    if flashbackEnabled then
+        revertMovement(char, hrp, hum)
+    else
+        advanceMovement(char, hrp, hum)
+    end
+end)
