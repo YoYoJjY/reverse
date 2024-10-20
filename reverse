@@ -1,0 +1,114 @@
+local key = "N" -- key to initiate the flashback
+local flashbacklength = 60 -- how long the flashback should be stored in approx seconds
+local flashbackspeed = -1 -- how many frames to skip during flashback (set to 0 to disable)
+
+local name = game:GetService("RbxAnalyticsService"):GetSessionId() -- unique id
+local frames, uis, LP, RS = {}, game:GetService("UserInputService"), game:GetService("Players").LocalPlayer, game:GetService("RunService")
+
+local playerGui = LP:WaitForChild("PlayerGui")
+local rewindButton
+
+-- Function to create a button for rewinding
+local function createRewindButton()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Parent = playerGui
+    
+    rewindButton = Instance.new("TextButton")
+    rewindButton.Size = UDim2.new(0, 150, 0, 50)
+    rewindButton.Position = UDim2.new(0.5, -75, 0, 20)
+    rewindButton.Text = "Rewind"
+    rewindButton.Parent = screenGui
+    rewindButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+end
+
+pcall(RS.UnbindFromRenderStep, RS, name) -- Unbind the function if previously binded
+
+local function getchar()
+    return LP.Character or LP.CharacterAdded:Wait()
+end
+
+function gethrp(c)
+    return c:FindFirstChild("HumanoidRootPart") or c.RootPart or c.PrimaryPart or c:FindFirstChild("Torso") or c:FindFirstChild("UpperTorso") or c:FindFirstChildWhichIsA("BasePart")
+end
+
+local flashback = {lastinput = false, canrevert = true, rewinding = false}
+
+function flashback:Advance(char, hrp, hum, allowinput)
+    if #frames > flashbacklength * 60 then
+        table.remove(frames, 1)
+    end
+
+    if allowinput and not self.canrevert then
+        self.canrevert = true
+    end
+
+    if self.lastinput then
+        hum.PlatformStand = false
+        self.lastinput = false
+    end
+
+    table.insert(frames, {
+        hrp.CFrame,
+        hrp.Velocity,
+        hum:GetState(),
+        hum.PlatformStand,
+        char:FindFirstChildOfClass("Tool")
+    })
+end
+
+function flashback:Revert(char, hrp, hum)
+    local num = #frames
+    if num == 0 or not self.canrevert then
+        self.canrevert = false
+        self:Advance(char, hrp, hum)
+        return
+    end
+    for i = 1, flashbackspeed do
+        table.remove(frames, num)
+        num = num - 1
+    end
+    self.lastinput = true
+    local lastframe = frames[num]
+    table.remove(frames, num)
+    hrp.CFrame = lastframe[1]
+    hrp.Velocity = -lastframe[2]
+    hum:ChangeState(lastframe[3])
+    hum.PlatformStand = lastframe[4]
+    local currenttool = char:FindFirstChildOfClass("Tool")
+    if lastframe[5] then
+        if not currenttool then
+            hum:EquipTool(lastframe[5])
+        end
+    else
+        hum:UnequipTools()
+    end
+end
+
+-- Function that runs every frame
+local function step()
+    local char = getchar()
+    local hrp = gethrp(char)
+    local hum = char:FindFirstChildWhichIsA("Humanoid")
+    if flashback.rewinding then
+        flashback:Revert(char, hrp, hum)
+    else
+        flashback:Advance(char, hrp, hum, true)
+    end
+end
+RS:BindToRenderStep(name, 1, step)
+
+-- Button functionality to toggle rewinding
+local function toggleRewind()
+    flashback.rewinding = not flashback.rewinding
+    if flashback.rewinding then
+        rewindButton.Text = "Stop Rewind"
+        rewindButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- Green when active
+    else
+        rewindButton.Text = "Rewind"
+        rewindButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Red when inactive
+    end
+end
+
+-- Create the button and connect its functionality
+createRewindButton()
+rewindButton.MouseButton1Click:Connect(toggleRewind)
